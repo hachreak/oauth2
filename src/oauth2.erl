@@ -34,6 +34,7 @@
 -export([authorize_code_request/5]).
 -export([issue_code/2]).
 -export([issue_token/2]).
+-export([issue_token/3]).
 -export([issue_token_and_refresh/2]).
 -export([verify_access_token/2]).
 -export([verify_access_code/2]).
@@ -235,6 +236,18 @@ issue_token(#a{client=Client, resowner=Owner, code=Code, scope=Scope, ttl=TTL},
                                                   , Ctx0 ),
     {ok, {Ctx1, oauth2_response:new(AccessToken, TTL, Owner, Scope)}}.
 
+-spec issue_token(auth(), token(), appctx()) -> {ok, {appctx(), response()}}.
+issue_token(#a{client=Client, resowner=Owner, code=Code, scope=Scope, ttl=TTL},
+            RefreshToken, Ctx0) ->
+  GrantContext = add_more_context(
+               [{code, Code}, {refresh_token, RefreshToken}],
+               build_context(Client, seconds_since_epoch(TTL), Owner, Scope)),
+    AccessToken  = ?TOKEN:generate(GrantContext),
+    {ok, Ctx1}   = ?BACKEND:associate_access_token( AccessToken
+                                                  , GrantContext
+                                                  , Ctx0 ),
+    {ok, {Ctx1, oauth2_response:new(AccessToken, TTL, Owner, Scope)}}.
+
 %% @doc Issues access and refresh tokens from an authorization.
 %%      Use it to implement the following steps of RFC 6749:
 %%      - 4.1.4. Authorization Code Grant > Access Token Response, with the
@@ -332,7 +345,7 @@ refresh_access_token(Client, RefreshToken, Scope, Ctx0) ->
                                                   , resowner = ResOwner
                                                   , scope    = VerScope
                                                   , ttl      = TTL
-                                                  }, Ctx3)
+                                                  }, RefreshToken, Ctx3)
                             end;
                         false ->
                             ?BACKEND:revoke_refresh_token(RefreshToken, Ctx2),
