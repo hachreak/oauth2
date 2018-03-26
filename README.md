@@ -125,6 +125,11 @@ The following example demonstrates a basic app.config section for oauth2.
             %% Recommended absolute expiry time from the spec
             {expiry_time, 600}
         ]}
+        ,{user2user_grant, [
+            %% Optional expiry_time override for direct user to user token
+            %% generation
+            {expiry_time, 600}
+        ]}
     ]}
 ].
 ```

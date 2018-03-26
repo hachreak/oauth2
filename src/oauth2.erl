@@ -80,14 +80,30 @@
                     unsupported_response_type | server_error |
                     temporarily_unavailable.
 
+
 %%%_* Code =============================================================
 %%%_ * API -------------------------------------------------------------
+
+%% @doc Authorize a user to confer to token to another user
+-spec authorize_password(list(user()) | user(), scope(), appctx())
+                            -> {ok, {appctx(), auth()}} | {error, error()}.
+authorize_password([User, UserDest], Scope, Ctx0) ->
+    case auth_user(User, Scope, Ctx0) of
+        {error, _}=E -> E;
+        {ok, {Ctx1, Auth}} ->
+          Auth2 = Auth#a{
+                resowner=UserDest,
+                ttl=oauth2_config:expiry_time(user2user_grant)
+          },
+          {ok, {Ctx1, Auth2}}
+    end;
+
 %% @doc Validates a request for an access token from resource owner's
 %%      credentials. Use it to implement the following steps of RFC 6749:
 %%      - 4.3.2. Resource Owner Password Credentials Grant >
 %%        Access Token Request, when the client is public.
--spec authorize_password(user(), scope(), appctx())
-                            -> {ok, {appctx(), auth()}} | {error, error()}.
+% -spec authorize_password(user(), scope(), appctx())
+%                             -> {ok, {appctx(), auth()}} | {error, error()}.
 authorize_password(User, Scope, Ctx0) ->
     case auth_user(User, Scope, Ctx0) of
         {error, _}=E -> E;
