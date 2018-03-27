@@ -91,10 +91,11 @@ authorize_password([User, UserDest], Scope, Ctx0) ->
     case auth_user(User, Scope, Ctx0) of
         {error, _}=E -> E;
         {ok, {Ctx1, Auth}} ->
-          Auth2 = Auth#a{
-                resowner=UserDest,
-                ttl=oauth2_config:expiry_time(user2user_grant)
-          },
+          TTL = oauth2_config:expiry_time(user2user_grant),
+          GrantContext = build_context(undefined, seconds_since_epoch(TTL),
+                                       UserDest, Scope),
+          AccessCode   = ?TOKEN:generate(GrantContext),
+          Auth2 = Auth#a{resowner=UserDest, code=AccessCode, ttl=TTL},
           {ok, {Ctx1, Auth2}}
     end;
 
@@ -250,7 +251,7 @@ issue_token(#a{client=Client, resowner=Owner, code=Code, scope=Scope, ttl=TTL},
     {ok, Ctx1}   = ?BACKEND:associate_access_token( AccessToken
                                                   , GrantContext
                                                   , Ctx0 ),
-    {ok, {Ctx1, oauth2_response:new(AccessToken, TTL, Owner, Scope)}}.
+    {ok, {Ctx1, oauth2_response:new({AccessToken, Code}, TTL, Owner, Scope)}}.
 
 -spec issue_token(auth(), token(), appctx()) -> {ok, {appctx(), response()}}.
 issue_token(#a{client=Client, resowner=Owner, code=Code, scope=Scope, ttl=TTL},
@@ -262,7 +263,7 @@ issue_token(#a{client=Client, resowner=Owner, code=Code, scope=Scope, ttl=TTL},
     {ok, Ctx1}   = ?BACKEND:associate_access_token( AccessToken
                                                   , GrantContext
                                                   , Ctx0 ),
-    {ok, {Ctx1, oauth2_response:new(AccessToken, TTL, Owner, Scope)}}.
+    {ok, {Ctx1, oauth2_response:new({AccessToken, Code}, TTL, Owner, Scope)}}.
 
 %% @doc Issues access and refresh tokens from an authorization.
 %%      Use it to implement the following steps of RFC 6749:

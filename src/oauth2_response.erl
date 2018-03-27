@@ -80,6 +80,13 @@ new(AccessToken, ExpiresIn) ->
     #response{access_token = AccessToken, expires_in = ExpiresIn}.
 
 -spec new(token(), lifetime(), term(), scope()) -> response().
+new({AccessToken, AccessCode}, ExpiresIn, ResOwner, Scope) ->
+    #response{ access_token   = AccessToken
+             , expires_in     = ExpiresIn
+             , resource_owner = ResOwner
+             , scope          = Scope
+             , access_code    = AccessCode
+             };
 new(AccessToken, ExpiresIn, ResOwner, Scope) ->
     #response{ access_token   = AccessToken
              , expires_in     = ExpiresIn
