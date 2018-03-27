@@ -62,6 +62,7 @@
            , code     = undefined    :: undefined | token()
            , scope                   :: scope()
            , ttl      = 0            :: non_neg_integer()
+           , resbenefit = undefined  :: undefined | term()
            }).
 
 -type context()  :: proplists:proplist().
@@ -95,7 +96,7 @@ authorize_password([User, UserDest], Scope, Ctx0) ->
           GrantContext = build_context(undefined, seconds_since_epoch(TTL),
                                        UserDest, Scope),
           AccessCode   = ?TOKEN:generate(GrantContext),
-          Auth2 = Auth#a{resowner=UserDest, code=AccessCode, ttl=TTL},
+          Auth2 = Auth#a{resbenefit=UserDest, code=AccessCode, ttl=TTL},
           {ok, {Ctx1, Auth2}}
     end;
 
@@ -242,10 +243,11 @@ issue_code(#a{client=Client, resowner=Owner, scope=Scope, ttl=TTL}, Ctx0) ->
 %%      - 4.4.3. Client Credentials Grant > Access Token Response, with the
 %%        result of authorize_client_credentials/4.
 -spec issue_token(auth(), appctx()) -> {ok, {appctx(), response()}}.
-issue_token(#a{client=Client, resowner=Owner, code=Code, scope=Scope, ttl=TTL},
+issue_token(#a{client=Client, resowner=Owner, code=Code, scope=Scope, ttl=TTL,
+               resbenefit=Beneficiary},
             Ctx0) ->
   GrantContext = add_more_context(
-               [{code, Code}],
+               [{code, Code}, {resource_benefit, Beneficiary}],
                build_context(Client, seconds_since_epoch(TTL), Owner, Scope)),
     AccessToken  = ?TOKEN:generate(GrantContext),
     {ok, Ctx1}   = ?BACKEND:associate_access_token( AccessToken
@@ -254,10 +256,12 @@ issue_token(#a{client=Client, resowner=Owner, code=Code, scope=Scope, ttl=TTL},
     {ok, {Ctx1, oauth2_response:new({AccessToken, Code}, TTL, Owner, Scope)}}.
 
 -spec issue_token(auth(), token(), appctx()) -> {ok, {appctx(), response()}}.
-issue_token(#a{client=Client, resowner=Owner, code=Code, scope=Scope, ttl=TTL},
+issue_token(#a{client=Client, resowner=Owner, code=Code, scope=Scope, ttl=TTL,
+               resbenefit=Beneficiary},
             RefreshToken, Ctx0) ->
   GrantContext = add_more_context(
-               [{code, Code}, {refresh_token, RefreshToken}],
+               [{code, Code}, {refresh_token, RefreshToken},
+                {resource_benefit, Beneficiary}],
                build_context(Client, seconds_since_epoch(TTL), Owner, Scope)),
     AccessToken  = ?TOKEN:generate(GrantContext),
     {ok, Ctx1}   = ?BACKEND:associate_access_token( AccessToken
@@ -424,6 +428,8 @@ build_context(Client, ExpiryTime, ResOwner, Scope) ->
 
 -spec add_more_context(list({atom(), term()}), context()) -> context().
 add_more_context([], Context) -> Context;
+add_more_context([{resource_benefit, Beneficiary} | Rest], Context) ->
+  add_more_context(Rest, [{<<"resource_benefit">>, Beneficiary} | Context]);
 add_more_context([{refresh_token, RefreshToken} | Rest], Context) ->
   add_more_context(Rest, [{<<"refresh_token">>, RefreshToken} | Context]);
 add_more_context([{code, Code} | Rest], Context) ->
